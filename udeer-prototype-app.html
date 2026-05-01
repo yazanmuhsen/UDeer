@@ -1,0 +1,1882 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Udeer AI - Financial Copilot</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        navy: { 500: '#1a365d', 600: '#152b4a', 700: '#0f1f38', 800: '#0c182e', 900: '#060d1a' },
+                        beige: { 100: '#fdfbf7', 200: '#f5f0e6', 300: '#eaddc6', 400: '#e0caa5', 500: '#d6b884' },
+                        danger: '#ef4444',
+                        success: '#10b981'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- CSV/Excel/PDF parsing helpers -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+
+<body class="bg-beige-200 text-navy-600 dark:bg-navy-900 dark:text-beige-200 transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Custom Icons
+        const Icons = {
+            Moon: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>,
+            Sun: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2m0 20v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m20 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>,
+            Globe: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>,
+            Deer: ({ className = "" }) => (
+                <>
+                    <img src="./logo light.png" alt="UDeer Logo" className={`object-contain block dark:hidden rounded-2xl mix-blend-multiply ${className}`} />
+                    <img src="./logo dark.png" alt="UDeer Logo" className={`object-contain hidden dark:block rounded-2xl mix-blend-screen ${className}`} />
+                </>
+            ),
+            Bell: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>,
+            TrendingUp: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>,
+            Upload: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>,
+            CreditCard: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>,
+            Message: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>,
+            AlertTriangle: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>,
+            Lightbulb: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1.45.62 2.76 1.5 3.5.76.76 1.23 1.52 1.41 2.5"></path></svg>,
+            Check: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        };
+
+        const translations = {
+            en: {
+                welcomeDesc: "Your definitive AI financial copilot. Organize messy data, predict trends, minimize losses, and get actionable insights for your business instantly.",
+                setupProfile: "Setup Profile",
+                demoMode: "Demo Mode",
+                businessSetup: "Business Setup",
+                businessName: "Business Name",
+                businessNamePH: "UDeer Innovations",
+                selectTemplate: "Select Template Hub",
+                templates: ["Freelancer / Content Creator", "E-commerce Store", "Consulting Agency", "Custom Setup"],
+                completeSetup: "Complete Setup & Launch AI",
+                configBranches: "Configure Branches",
+                configBranchesDesc: "UDeer supports multi-branch data syncing. Add locations to track inventory and performance individually.",
+                addBranch: "+ Add Branch",
+                dashboard: "Dashboard",
+                dataUpload: "Data & Upload",
+                bankingBills: "Banking & Bills",
+                notifications: "Notifications",
+                financialOverview: "Financial Overview",
+                totalRev: "Total Revenue",
+                totalExp: "Total Expenses",
+                netProfit: "Net Profit",
+                vsLastMonth: "vs last month",
+                cashflowTrends: "Cashflow Trends",
+                aiWarnings: "AI Warnings",
+                keyInsights: "Key Insights",
+                aiRec: "AI Recommendation",
+                dataIngestion: "Data Ingestion & AI Parsing",
+                uploadFile: "Upload File",
+                dragFiles: "Drag CSV, Excel, or PDF invoices here",
+                browseFiles: "Browse Files",
+                nlToTable: "Natural Language to Table",
+                nlDesc: "Describe the data you want to log, and UDeer AI will structure it instantly.",
+                nlPH: "e.g. 'I just bought 5 office chairs for $120 each from Ike and sold a software bundle to TechNova for $5000.'",
+                extractOrg: "Extract & Organize",
+                openBanking: "Simulated Open Banking",
+                openBankingDesc: "Read/Write operations natively inside UDeer.",
+                payBill: "Pay a Bill",
+                date: "Date",
+                desc: "Description",
+                amount: "Amount",
+                chatTitle: "UDeer Assistant",
+                chatAsk: "Ask financial advice...",
+                chatMsg: "Hi! I noticed Marketing expenses spiked. Should we run a 'what-if' scenario on cutting ad spend by 20%?",
+                simOutput: "Successfully parsed 1 PDF invoice. Detected Vendor: AWS. Amount: $420. Logged under recurring expenses.",
+                noNotifs: "No new notifications",
+                langToggle: "عربي",
+                startSetup: "Start Setup",
+                onboardingTitle: "Setup Wizard",
+                profileStep: "Profile",
+                businessStep: "Business",
+                bankStep: "Bank Connect",
+                demoStep: "Demo Mode",
+                continue: "Continue",
+                back: "Back",
+                connectBank: "Connect Bank",
+                bankConnected: "Bank Connected",
+                bankDisclaimer: "Simulation only. No real bank data is stored or transmitted.",
+                demoModeTitle: "Try Demo Mode",
+                demoModeDesc: "Load virtual data so you can explore the dashboard safely.",
+                startDemo: "Launch Demo",
+                launchDashboard: "Launch Dashboard",
+                resetDemo: "Reset Demo Data",
+                exitDemo: "Exit Demo"
+            },
+            ar: {
+                welcomeDesc: "مساعدك المالي الذكي بمساعدة الذكاء الاصطناعي. قم بتنظيم البيانات الفوضوية، وتوقع الاتجاهات المستقبلية، وتقليل الخسائر، واحصل على رؤى قابلة للتنفيذ لعملك على الفور.",
+                setupProfile: "إعداد الملف الشخصي",
+                demoMode: "الوضع التجريبي",
+                businessSetup: "إعداد العمل",
+                businessName: "اسم العمل",
+                businessNamePH: "ابتكارات UDeer",
+                selectTemplate: "اختر قالب العمل",
+                templates: ["مستقل / صانع محتوى", "متجر إلكتروني", "وكالة أبحاث / استشارات", "إعداد مخصص"],
+                completeSetup: "أكمل الإعداد وانطلق",
+                configBranches: "إعداد الفروع",
+                configBranchesDesc: "يدعم UDeer المزامنة السحابية للفروع المتعددة. أضف مواقع لتتبع المخزون والأداء من مكان واحد.",
+                addBranch: "+ إضافة فرع",
+                dashboard: "لوحة التحكم",
+                dataUpload: "رفع و استخراج البيانات",
+                bankingBills: "البنوك والفواتير",
+                notifications: "الإشعارات",
+                financialOverview: "التحليل المالي",
+                totalRev: "إجمالي الإيرادات",
+                totalExp: "إجمالي النفقات",
+                netProfit: "صافي الربح",
+                vsLastMonth: "مقارنة بالشهر الماضي",
+                cashflowTrends: "اتجاهات التدفق النقدي",
+                aiWarnings: "تحذيرات الذكاء الاصطناعي",
+                keyInsights: "رؤى وأفكار رئيسية",
+                aiRec: "توصيات الذكاء الاصطناعي",
+                dataIngestion: "استخراج البيانات الذكي",
+                uploadFile: "رفع ملف",
+                dragFiles: "اسحب فواتير (CSV, Excel, PDF) هنا",
+                browseFiles: "تصفح الملفات",
+                nlToTable: "من النصوص إلى جداول منظمة",
+                nlDesc: "صف النفقات أو البيانات التي تريد تسجيلها، وسيقوم UDeer AI بتنظيمها في جداول فوراً.",
+                nlPH: "مثال: 'اشتريت للتو 5 كراسي مكتبية مقابل 120 دولارًا لكل منها وبعت حزمة برامج إلى تيكنوفا مقابل 5000 دولار'",
+                extractOrg: "حلّل ونظّم البيانات",
+                openBanking: "الخدمات المصرفية (محاكاة)",
+                openBankingDesc: "قراءة وكتابة البيانات المصرفية والعمليات من واجهة واحدة.",
+                payBill: "دفع فاتورة",
+                date: "التاريخ",
+                desc: "الوصف",
+                amount: "المبلغ",
+                chatTitle: "مساعد UDeer",
+                chatAsk: "اسأل أي استشارة مالية...",
+                chatMsg: "مرحباً! لاحظت ارتفاعاً في نفقات التسويق. هل ترغب بأن نقوم بمحاكاة لمدى تأثير تقليل الإنفاق الإعلاني بنسبة 20٪؟",
+                simOutput: "تم تحليل فاتورة PDF واحدة بنجاح. البائع: AWS. المبلغ: 420 دولاراً. تم تسجيلها ضمن قائمة النفقات المتكررة.",
+                noNotifs: "لا توجد إشعارات جديدة",
+                langToggle: "English",
+                startSetup: "ابدأ الإعداد",
+                onboardingTitle: "معالج الإعداد",
+                profileStep: "الملف الشخصي",
+                businessStep: "العمل",
+                bankStep: "ربط البنك",
+                demoStep: "الوضع التجريبي",
+                continue: "التالي",
+                back: "رجوع",
+                connectBank: "ربط البنك",
+                bankConnected: "تم ربط البنك",
+                bankDisclaimer: "محاكاة فقط. لا يتم حفظ أو إرسال أي بيانات بنكية حقيقية.",
+                demoModeTitle: "جرّب الوضع التجريبي",
+                demoModeDesc: "تحميل بيانات افتراضية لاستكشاف اللوحة بأمان.",
+                startDemo: "تشغيل التجربة",
+                launchDashboard: "بدء اللوحة",
+                resetDemo: "إعادة تعيين بيانات التجربة",
+                exitDemo: "الخروج من التجربة"
+            }
+        };
+
+        const getDemoData = (lang) => {
+            if (lang === 'ar') {
+                return {
+                    monthlyPerformance: { labels: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو'], revenue: [12000, 15000, 14000, 18000, 16000, 22000], expenses: [8000, 9500, 8500, 11000, 10500, 12000] },
+                    insights: [
+                        "نمو إيرادات الاشتراكات بنسبة 18٪ مقارنة بالشهر الماضي.",
+                        "يمثل العميل 'تيكنوفا (TechNova)' 35٪ من إجمالي إيراداتك.",
+                        "تحسن العائد على الاستثمار التسويقي (ROI): 120 دولارًا من الإيرادات لكل 10 دولارات من الإنفاق الإعلاني."
+                    ],
+                    warnings: [
+                        "الذكاء الاصطناعي: تم اكتشاف خسارة متكررة في 'المنتج X' خلال الأرباع الثلاثة الماضية.",
+                        "الذكاء الاصطناعي: ارتفاع كبير ومفاجئ في النفقات: قفزت تراخيص البرمجيات بنسبة 40٪ في 12 مايو."
+                    ],
+                    recommendation: "فكر في شراء أرصدة الخوادم والاستضافات بالجملة. يُظهر تحليل البيانات أنك تدفع مبالغ زائدة بنسبة 15٪ عند الاشتراك بالباقات الشهرية المؤقتة.",
+                    notifications: [
+                        "تذكير: فاتورة AWS مستحقة خلال 3 أيام.",
+                        "AI: نظم الذكاء الاصطناعي 14 صفاً عشوائياً في جدول 'نفقات السفر'.",
+                        "نجاح: قامت الخدمات المصرفية المفتوحة بمزامنة 24 معاملة بنكية جديدة."
+                    ],
+                    transactions: [
+                        { id: 1, date: '2026-04-26', desc: 'دفعة حساب (Stripe)', amount: 3450, type: 'in' },
+                        { id: 2, date: '2026-04-24', desc: 'خدمات استضافة سحابية (AWS)', amount: -420, type: 'out' },
+                        { id: 3, date: '2026-04-22', desc: 'استشارات شركة تيكنوفا', amount: 5000, type: 'in' },
+                    ]
+                };
+            }
+            return {
+                monthlyPerformance: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], revenue: [12000, 15000, 14000, 18000, 16000, 22000], expenses: [8000, 9500, 8500, 11000, 10500, 12000] },
+                insights: [
+                    "Your subscription revenue grew by 18% compared to last month.",
+                    "Client 'TechNova' accounts for 35% of your total revenue.",
+                    "Marketing ROI has improved: $120 revenue per $10 ad spend."
+                ],
+                warnings: [
+                    "Continuous loss detected on 'Product X' over the last 3 quarters.",
+                    "High expense spike: Software licenses jumped by 40% on May 12."
+                ],
+                recommendation: "Consider bulk-purchasing server credits. Analyzing history shows you are overpaying by 15% on monthly tiers.",
+                notifications: [
+                    "Warning: AWS Invoice due in 3 days.",
+                    "AI Organized 14 messy rows into 'Travel Expenses' sheet.",
+                    "Success: Open Banking synced 24 new transactions."
+                ],
+                transactions: [
+                    { id: 1, date: '2026-04-26', desc: 'Stripe Payout', amount: 3450, type: 'in' },
+                    { id: 2, date: '2026-04-24', desc: 'AWS Hosting', amount: -420, type: 'out' },
+                    { id: 3, date: '2026-04-22', desc: 'TechNova Consulting', amount: 5000, type: 'in' },
+                ]
+            };
+        };
+
+        const coerceNumber = (val) => {
+            if (val === null || val === undefined) return null;
+            if (typeof val === 'number' && !Number.isNaN(val)) return val;
+            const cleaned = String(val).replace(/[^0-9.-]/g, '');
+            const num = parseFloat(cleaned);
+            return Number.isNaN(num) ? null : num;
+        };
+
+        const normalizeRow = (row) => {
+            if (!row || typeof row !== 'object') return null;
+
+            const keys = Object.keys(row || {});
+            const lookup = {};
+            keys.forEach(k => { lookup[k.trim().toLowerCase()] = k; });
+
+            const findKey = (regex) => {
+                for (const lk of Object.keys(lookup)) {
+                    if (regex.test(lk)) return lookup[lk];
+                }
+                return null;
+            };
+
+            const dateKey = findKey(/date|created|timestamp|time/);
+            const descKey = findKey(/desc|description|memo|vendor|payee|narrative/);
+            const amountKey = findKey(/amount|total|value|amt|price|debit|credit|net/);
+
+            const date = dateKey ? row[dateKey] : (row.date || row.Date || row.DATE || row.created_at || row.Created || '');
+            const desc = descKey ? row[descKey] : (row.desc || row.description || row.Description || row.memo || row.Memo || row.vendor || row.Vendor || 'Invoice entry');
+
+            let amountRaw = amountKey ? row[amountKey] : (row.amount || row.Amount || row.total || row.Total || row.value || row.Value);
+
+            // Fallback: find any numeric-looking cell if no explicit amount column
+            if (amountRaw === undefined || amountRaw === null || String(amountRaw).trim() === '') {
+                for (const k of keys) {
+                    const v = row[k];
+                    if (typeof v === 'number') { amountRaw = v; break; }
+                    if (typeof v === 'string' && /-?\d[\d,\.\s()]+/.test(v)) { amountRaw = v; break; }
+                }
+            }
+
+            if (amountRaw === undefined || amountRaw === null) return null;
+
+            // Detect parentheses-form negatives like (420.00)
+            const rawStr = String(amountRaw || '');
+            const hasParensNegative = /\(.*\)/.test(rawStr) && rawStr.indexOf('(') >= 0;
+
+            const amt = coerceNumber(amountRaw);
+            if (amt === null) return null;
+            const amount = hasParensNegative ? -Math.abs(amt) : amt;
+
+            const type = amount >= 0 ? 'in' : 'out';
+
+            return {
+                id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                date: date || new Date().toISOString().slice(0, 10),
+                desc: String(desc),
+                amount: amount,
+                type
+            };
+        };
+
+        const buildMonthlyPerformance = (transactions, lang) => {
+            const now = new Date();
+            const months = [];
+            for (let i = 5; i >= 0; i -= 1) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                months.push(d);
+            }
+
+            const labels = months.map(m => {
+                const label = m.toLocaleString(lang === 'ar' ? 'ar' : 'en', { month: 'short' });
+                return label;
+            });
+
+            const revenue = months.map(m => {
+                const year = m.getFullYear();
+                const month = m.getMonth();
+                return transactions
+                    .filter(t => {
+                        if (!t.date) return false;
+                        const d = new Date(t.date);
+                        return !isNaN(d.getTime()) && d.getFullYear() === year && d.getMonth() === month && t.amount > 0;
+                    })
+                    .reduce((sum, t) => sum + t.amount, 0);
+            });
+
+            const expenses = months.map(m => {
+                const year = m.getFullYear();
+                const month = m.getMonth();
+                return transactions
+                    .filter(t => {
+                        if (!t.date) return false;
+                        const d = new Date(t.date);
+                        return !isNaN(d.getTime()) && d.getFullYear() === year && d.getMonth() === month && t.amount < 0;
+                    })
+                    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+            });
+
+            return { labels, revenue, expenses };
+        };
+
+        const calcKpis = (transactions) => {
+            const totalRev = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+            const totalExp = transactions.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+            const netProfit = totalRev - totalExp;
+            return { totalRev, totalExp, netProfit };
+        };
+
+        const buildInsights = (transactions, lang) => {
+            if (!transactions.length) return [];
+            const totalRev = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+            const totalExp = transactions.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+            const net = totalRev - totalExp;
+
+            const topIncome = transactions
+                .filter(t => t.amount > 0)
+                .sort((a, b) => b.amount - a.amount)[0];
+            const topExpense = transactions
+                .filter(t => t.amount < 0)
+                .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))[0];
+
+            const insights = [];
+            insights.push(lang === 'ar'
+                ? `صافي الربح الحالي: ${net.toLocaleString()}$`
+                : `Current net profit: $${net.toLocaleString()}`);
+            if (topIncome) {
+                insights.push(lang === 'ar'
+                    ? `أكبر دخل: ${topIncome.desc} بقيمة ${topIncome.amount.toLocaleString()}$`
+                    : `Top income: ${topIncome.desc} at $${topIncome.amount.toLocaleString()}`);
+            }
+            if (topExpense) {
+                insights.push(lang === 'ar'
+                    ? `أكبر مصروف: ${topExpense.desc} بقيمة ${Math.abs(topExpense.amount).toLocaleString()}$`
+                    : `Top expense: ${topExpense.desc} at $${Math.abs(topExpense.amount).toLocaleString()}`);
+            }
+            return insights;
+        };
+
+        const buildWarnings = (transactions, lang) => {
+            if (!transactions.length) return [];
+            const totalRev = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+            const totalExp = transactions.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+            const warnings = [];
+            if (totalExp > totalRev) {
+                warnings.push(lang === 'ar'
+                    ? 'النفقات أعلى من الإيرادات الحالية.'
+                    : 'Expenses are higher than current revenue.');
+            }
+            const largeExpense = transactions.find(t => t.amount < 0 && Math.abs(t.amount) > totalExp * 0.4);
+            if (largeExpense) {
+                warnings.push(lang === 'ar'
+                    ? `مصروف كبير تم اكتشافه: ${largeExpense.desc}`
+                    : `Large expense detected: ${largeExpense.desc}`);
+            }
+            return warnings;
+        };
+
+        const rowsToCsv = (rows) => {
+            const escapeVal = (val) => {
+                const text = String(val ?? "");
+                if (text.includes(",") || text.includes("\n") || text.includes("\"")) {
+                    return `"${text.replace(/"/g, '""')}"`;
+                }
+                return text;
+            };
+
+            const header = ["date", "description", "amount"].join(",");
+            const lines = rows.map(row => {
+                const date = row.date || "";
+                const desc = row.desc || row.description || "";
+                const amount = row.amount ?? "";
+                return [date, desc, amount].map(escapeVal).join(",");
+            });
+
+            return [header, ...lines].join("\n");
+        };
+
+        const COUNTRIES = [
+            "United Arab Emirates",
+            "Saudi Arabia",
+            "Qatar",
+            "Kuwait",
+            "Bahrain",
+            "Oman",
+            "Egypt",
+            "Jordan",
+            "Lebanon",
+            "United States",
+            "United Kingdom",
+            "Canada"
+        ];
+
+        const CURRENCIES = [
+            { code: "AED", label: "AED - UAE Dirham" },
+            { code: "SAR", label: "SAR - Saudi Riyal" },
+            { code: "QAR", label: "QAR - Qatari Riyal" },
+            { code: "KWD", label: "KWD - Kuwaiti Dinar" },
+            { code: "BHD", label: "BHD - Bahraini Dinar" },
+            { code: "OMR", label: "OMR - Omani Rial" },
+            { code: "EGP", label: "EGP - Egyptian Pound" },
+            { code: "JOD", label: "JOD - Jordanian Dinar" },
+            { code: "LBP", label: "LBP - Lebanese Pound" },
+            { code: "USD", label: "USD - US Dollar" },
+            { code: "GBP", label: "GBP - British Pound" },
+            { code: "CAD", label: "CAD - Canadian Dollar" }
+        ];
+
+        // Main App Component
+        function App() {
+            const [view, setView] = useState('welcome');
+            const [isDarkMode, setIsDarkMode] = useState(false);
+            const [lang, setLang] = useState('en');
+            const [notificationsOpen, setNotificationsOpen] = useState(false);
+            const [businessState, setBusinessState] = useState({ name: '', type: '', country: '', currency: '' });
+            const [transactions, setTransactions] = useState([]);
+            const [parseStatus, setParseStatus] = useState('');
+            const [demoMode, setDemoMode] = useState(false);
+            const [wizardStep, setWizardStep] = useState(0);
+            const [profileState, setProfileState] = useState({ name: '', email: '', phone: '' });
+            const [bankState, setBankState] = useState({ connected: false, bankName: '', accountMask: '' });
+            const [bankModalOpen, setBankModalOpen] = useState(false);
+            const [payModalOpen, setPayModalOpen] = useState(false);
+            const [aiAnalysis, setAiAnalysis] = useState({ insights: [], warnings: [] });
+
+            const t = translations[lang];
+            const d = getDemoData(lang);
+            const effectiveTransactions = transactions;
+            const kpis = calcKpis(effectiveTransactions);
+            const monthlyPerformance = buildMonthlyPerformance(effectiveTransactions, lang);
+            const aiInsights = aiAnalysis.insights.length ? aiAnalysis.insights : (demoMode ? d.insights : buildInsights(effectiveTransactions, lang));
+            const aiWarnings = aiAnalysis.warnings.length ? aiAnalysis.warnings : (demoMode ? d.warnings : buildWarnings(effectiveTransactions, lang));
+            const notifications = demoMode ? d.notifications : [];
+
+            useEffect(() => {
+                const root = document.documentElement;
+                isDarkMode ? root.classList.add('dark') : root.classList.remove('dark');
+                root.lang = lang;
+                root.dir = lang === 'ar' ? 'rtl' : 'ltr';
+            }, [isDarkMode, lang]);
+
+            const startDemoMode = () => {
+                setDemoMode(true);
+                setBusinessState({ name: lang === 'en' ? 'Your financial consultant' : 'مستشارك المالي', type: 'Consulting' });
+                setTransactions(getDemoData(lang).transactions);
+                setView('dashboard');
+            };
+
+            const exitDemoMode = () => {
+                setDemoMode(false);
+                setTransactions([]);
+                setView('welcome');
+            };
+
+            const resetDemoData = () => {
+                setTransactions(getDemoData(lang).transactions);
+            };
+
+            const addTransactions = (rows) => {
+                const normalized = rows
+                    .map(normalizeRow)
+                    .filter(Boolean);
+
+                if (!normalized.length) {
+                    setParseStatus(lang === 'ar'
+                        ? 'لم يتم العثور على بيانات قابلة للقراءة.'
+                        : 'No readable entries found.');
+                    return;
+                }
+
+                // Diagnostic logging for upload debugging
+                try {
+                    // show first few raw rows and normalized rows
+                    console.debug('Upload - raw rows sample:', rows.slice(0, 5));
+                    console.debug('Upload - normalized sample:', normalized.slice(0, 5));
+                } catch (e) {
+                    // ignore logging errors
+                }
+
+                setTransactions(prev => [...normalized, ...prev]);
+                setParseStatus(lang === 'ar'
+                    ? `تمت إضافة ${normalized.length} عمليات.`
+                    : `${normalized.length} transactions added.`);
+            };
+
+            const analyzeCsvWithAI = async (csvText, skipTransactions = false) => {
+                if (!csvText) return;
+                try {
+                    const response = await fetch(`${API_BASE}/api/analyze`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            type: "csv",
+                            csvText,
+                            lang,
+                            skipTransactions
+                        })
+                    });
+
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    const insights = Array.isArray(data.insights) ? data.insights : [];
+                    const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+                    setAiAnalysis({ insights, warnings });
+                    if (!skipTransactions && Array.isArray(data.transactions) && data.transactions.length > 0) {
+                        addTransactions(data.transactions);
+                    }
+                } catch (err) {
+                    // Keep heuristic insights if AI analysis fails.
+                    if (!skipTransactions && csvText) {
+                        window.Papa.parse(csvText, {
+                            header: true,
+                            skipEmptyLines: true,
+                            complete: results => {
+                                if (results.data && results.data.length > 0) {
+                                    addTransactions(results.data);
+                                }
+                            }
+                        });
+                    }
+                }
+            };
+
+            const analyzeMediaWithAI = async ({ fileName, fileType, textContent, dataUrl }) => {
+                try {
+                    const response = await fetch(`${API_BASE}/api/analyze`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            type: fileType,
+                            fileName,
+                            textContent,
+                            dataUrl,
+                            lang
+                        })
+                    });
+
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    const insights = Array.isArray(data.insights) ? data.insights : [];
+                    const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+                    setAiAnalysis({ insights, warnings });
+                    if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+                        addTransactions(data.transactions);
+                    }
+                } catch (err) {
+                    // Keep heuristic insights if AI analysis fails.
+                }
+            };
+
+            const toggleLang = () => {
+                const newLang = lang === 'en' ? 'ar' : 'en';
+                setLang(newLang);
+
+                // If we have AI-generated insights/warnings currently saved
+                if (aiAnalysis.insights.length > 0 || aiAnalysis.warnings.length > 0) {
+                    if (transactions.length > 0) {
+                        // Attempt to regenerate them in the new language
+                        fetch(`${API_BASE}/api/analyze`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                type: "csv",
+                                csvText: rowsToCsv(transactions),
+                                lang: newLang,
+                                skipTransactions: true
+                            })
+                        }).then(async res => {
+                            if (res.ok) {
+                                const data = await res.json();
+                                if (Array.isArray(data.insights)) {
+                                    setAiAnalysis({
+                                        insights: data.insights,
+                                        warnings: Array.isArray(data.warnings) ? data.warnings : []
+                                    });
+                                }
+                            } else {
+                                setAiAnalysis({ insights: [], warnings: [] });
+                            }
+                        }).catch(() => {
+                            setAiAnalysis({ insights: [], warnings: [] });
+                        });
+                    } else {
+                        setAiAnalysis({ insights: [], warnings: [] });
+                    }
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col font-sans transition-all duration-500 pt-16">
+                    {/* Top Header */}
+                    {view !== 'welcome' && view !== 'onboarding' && (
+                        <header className="h-16 fixed top-0 left-0 right-0 flex justify-between items-center px-6 bg-beige-200/90 dark:bg-navy-900/90 backdrop-blur-md border-b border-navy-500/10 dark:border-beige-200/10 z-50 shadow-sm">
+                            <div className="flex items-center gap-3 h-full">
+                                <Icons.Deer className="w-auto h-12 sm:h-14 drop-shadow-sm" />
+                                <div className="h-6 border-r border-navy-600/20 dark:border-beige-300/20 mx-2"></div>
+                                <span className="font-medium opacity-80">{lang === 'en' ? 'Your financial consultant' : 'مستشارك المالي'}</span>
+                            </div>
+                            <div className="flex items-center gap-4 relative">
+                                <button onClick={toggleLang} className="flex items-center gap-1 font-bold text-sm bg-navy-600/10 dark:bg-beige-300/10 px-3 py-1.5 rounded-full hover:bg-navy-600/20 dark:hover:bg-beige-300/20 transition">
+                                    <Icons.Globe /> {t.langToggle}
+                                </button>
+                                <button className="relative p-2 rounded-full hover:bg-navy-500/10 dark:hover:bg-beige-200/10 transition" onClick={() => setNotificationsOpen(!notificationsOpen)}>
+                                    <Icons.Bell />
+                                    <span className="absolute top-1 end-1 w-2.5 h-2.5 bg-danger rounded-full border-2 border-beige-200 dark:border-navy-900"></span>
+                                </button>
+
+                                {notificationsOpen && (
+                                    <div className={"absolute top-12 w-80 bg-beige-100 dark:bg-navy-800 border border-navy-500/10 dark:border-beige-200/10 rounded-xl shadow-xl overflow-hidden z-50 " + (lang === 'en' ? "right-12" : "left-12")}>
+                                        <div className="p-3 border-b border-navy-500/10 dark:border-beige-200/10 font-bold bg-beige-200 dark:bg-navy-700">{t.notifications}</div>
+                                        <div className="max-h-64 overflow-y-auto">
+                                            {notifications.map((n, i) => (
+                                                <div key={i} className="p-3 border-b border-navy-500/5 dark:border-beige-200/5 text-sm hover:bg-navy-500/5 dark:hover:bg-beige-200/5 cursor-pointer">
+                                                    {n}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full hover:bg-navy-500/10 dark:hover:bg-beige-200/10 transition">
+                                    {isDarkMode ? <Icons.Sun /> : <Icons.Moon />}
+                                </button>
+                                {demoMode && (
+                                    <button onClick={exitDemoMode} className="text-xs font-bold bg-danger/10 text-danger px-3 py-1.5 rounded-full hover:bg-danger/20 transition">
+                                        {t.exitDemo}
+                                    </button>
+                                )}
+                            </div>
+                        </header>
+                    )}
+
+                    <div className="flex flex-1 overflow-hidden">
+                        {/* Sidebar */}
+                        {view !== 'welcome' && view !== 'onboarding' && (
+                            <aside className="w-64 border-navy-500/10 dark:border-beige-200/10 bg-beige-100 dark:bg-navy-900/50 p-4 flex flex-col gap-2" style={{ borderInlineEndWidth: '1px' }}>
+                                {[
+                                    { id: 'dashboard', label: t.dashboard, icon: <Icons.TrendingUp /> },
+                                    { id: 'upload', label: t.dataUpload, icon: <Icons.Upload /> },
+                                    { id: 'banking', label: t.bankingBills, icon: <Icons.CreditCard /> }
+                                ].map(item => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => setView(item.id)}
+                                        className={`flex items-center gap-3 w-full p-3 rounded-lg font-medium transition-all ${view === item.id ? 'bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 shadow-md' : 'hover:bg-navy-500/10 dark:hover:bg-beige-200/10'}`}
+                                    >
+                                        {item.icon}
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </aside>
+                        )}
+
+                        {/* Main Content Area */}
+                        <main className="flex-1 overflow-y-auto p-6 md:p-8 relative">
+                            {view === 'welcome' && (
+                                <WelcomeView
+                                    setView={setView}
+                                    startDemo={startDemoMode}
+                                    t={t}
+                                    toggleLang={toggleLang}
+                                    lang={lang}
+                                    isDarkMode={isDarkMode}
+                                    setIsDarkMode={setIsDarkMode}
+                                />
+                            )}
+                            {view === 'onboarding' && (
+                                <OnboardingWizard
+                                    t={t}
+                                    lang={lang}
+                                    wizardStep={wizardStep}
+                                    setWizardStep={setWizardStep}
+                                    profileState={profileState}
+                                    setProfileState={setProfileState}
+                                    businessState={businessState}
+                                    setBusinessState={setBusinessState}
+                                    bankState={bankState}
+                                    setBankState={setBankState}
+                                    openBankModal={() => setBankModalOpen(true)}
+                                    launchDashboard={() => setView('dashboard')}
+                                    startDemo={startDemoMode}
+                                />
+                            )}
+                            {view === 'dashboard' && (
+                                <DashboardView
+                                    t={t}
+                                    d={d}
+                                    lang={lang}
+                                    kpis={kpis}
+                                    monthlyPerformance={monthlyPerformance}
+                                    demoMode={demoMode}
+                                    onResetDemo={resetDemoData}
+                                    aiInsights={aiInsights}
+                                    aiWarnings={aiWarnings}
+                                />
+                            )}
+                            {view === 'upload' && (
+                                <UploadView
+                                    t={t}
+                                    lang={lang}
+                                    onAddTransactions={addTransactions}
+                                    parseStatus={parseStatus}
+                                    setParseStatus={setParseStatus}
+                                    onAnalyzeCsv={analyzeCsvWithAI}
+                                    onAnalyzeMedia={analyzeMediaWithAI}
+                                    demoMode={demoMode}
+                                />
+                            )}
+                            {view === 'banking' && (
+                                <BankingView
+                                    t={t}
+                                    d={{ ...d, transactions: effectiveTransactions }}
+                                    lang={lang}
+                                    bankState={bankState}
+                                    openBankModal={() => setBankModalOpen(true)}
+                                    openPayModal={() => setPayModalOpen(true)}
+                                />
+                            )}
+                        </main>
+                    </div>
+
+                    {/* Chatbot Floating Widget */}
+                    {view !== 'welcome' && view !== 'onboarding' && (
+                        <ChatWidget
+                            lang={lang}
+                            t={t}
+                            appState={{
+                                view,
+                                businessState,
+                                demoData: d,
+                                transactions: effectiveTransactions,
+                                kpis,
+                                monthlyPerformance,
+                                demoMode
+                            }}
+                        />
+                    )}
+
+                    {bankModalOpen && (
+                        <BankConnectModal
+                            t={t}
+                            lang={lang}
+                            onClose={() => setBankModalOpen(false)}
+                            onConnect={(payload) => {
+                                setBankState({ connected: true, bankName: payload.bankName, accountMask: payload.accountMask });
+                                setBankModalOpen(false);
+                            }}
+                        />
+                    )}
+
+                    {payModalOpen && (
+                        <PayBillModal
+                            t={t}
+                            lang={lang}
+                            onClose={() => setPayModalOpen(false)}
+                            onPay={(payload) => {
+                                const row = {
+                                    date: payload.date,
+                                    desc: `Bill Payment - ${payload.vendor}`,
+                                    amount: -Math.abs(payload.amount)
+                                };
+                                addTransactions([
+                                    {
+                                        date: row.date,
+                                        desc: row.desc,
+                                        amount: row.amount
+                                    }
+                                ]);
+                                analyzeCsvWithAI(rowsToCsv([row]));
+                                setPayModalOpen(false);
+                            }}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        // ================= VIEWS =================
+
+        function WelcomeView({ setView, startDemo, t, toggleLang, lang, isDarkMode, setIsDarkMode }) {
+            return (
+                <div className="h-full flex flex-col justify-center items-center text-center space-y-12 animate-fade-in max-w-4xl mx-auto relative pt-16 pb-20">
+
+                    {/* Floating Glow Effects */}
+                    <div className="absolute top-10 w-96 h-96 bg-navy-400/10 dark:bg-beige-300/10 blur-[100px] rounded-full -z-10 animate-pulse pointer-events-none"></div>
+
+                    <div className={"absolute top-[-20px] flex gap-4 items-center " + (lang === 'en' ? 'right-0' : 'left-0')}>
+                        <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 rounded-full bg-navy-600/10 dark:bg-beige-300/10 hover:bg-navy-600/20 dark:hover:bg-beige-300/20 transition">
+                            {isDarkMode ? <Icons.Sun /> : <Icons.Moon />}
+                        </button>
+                        <button onClick={toggleLang} className="flex gap-2 items-center font-bold text-sm bg-navy-600/10 dark:bg-beige-300/10 px-4 py-2 rounded-full hover:bg-navy-600/20 dark:hover:bg-beige-300/20 transition">
+                            <Icons.Globe /> {t.langToggle}
+                        </button>
+                    </div>
+
+                    {/* Huge Logo with premium shadow */}
+                    <div className="w-full max-w-md md:max-w-xl mx-auto flex justify-center transform transition hover:scale-105 duration-700">
+                        <Icons.Deer className="w-auto h-64 md:h-96 drop-shadow-2xl" />
+                    </div>
+
+                    <div className="space-y-6">
+                        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">
+                            {lang === 'en' ? 'Your financial consultant' : 'مستشارك المالي'}
+                        </h1>
+                        <p className="text-xl md:text-2xl font-medium opacity-80 leading-relaxed max-w-2xl mx-auto">{t.welcomeDesc}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mt-8 opacity-90">
+                        <div className="p-6 bg-beige-300/30 dark:bg-navy-800/30 rounded-2xl border border-navy-500/10 dark:border-beige-200/10 backdrop-blur-sm">
+                            <Icons.Lightbulb className="w-8 h-8 mx-auto mb-3 text-navy-500 dark:text-beige-300" />
+                            <h3 className="font-bold mb-2">{lang === 'en' ? 'Smart Insights' : 'رؤى ذكية'}</h3>
+                            <p className="text-sm">{lang === 'en' ? 'Automated insights for your cash flow.' : 'تحليلات مالية ذكية للتدفق النقدي.'}</p>
+                        </div>
+                        <div className="p-6 bg-beige-300/30 dark:bg-navy-800/30 rounded-2xl border border-navy-500/10 dark:border-beige-200/10 backdrop-blur-sm">
+                            <Icons.Message className="w-8 h-8 mx-auto mb-3 text-navy-500 dark:text-beige-300" />
+                            <h3 className="font-bold mb-2">{lang === 'en' ? 'Natural Language' : 'لغة طبيعية'}</h3>
+                            <p className="text-sm">{lang === 'en' ? 'Talk to your finances naturally.' : 'تحدث إلى نظامك المالي ببساطة.'}</p>
+                        </div>
+                        <div className="p-6 bg-beige-300/30 dark:bg-navy-800/30 rounded-2xl border border-navy-500/10 dark:border-beige-200/10 backdrop-blur-sm">
+                            <Icons.TrendingUp className="w-8 h-8 mx-auto mb-3 text-navy-500 dark:text-beige-300" />
+                            <h3 className="font-bold mb-2">{lang === 'en' ? 'Live Tracking' : 'تتبع حي'}</h3>
+                            <p className="text-sm">{lang === 'en' ? 'Real-time growth monitoring.' : 'تتبع نمو أعمالك في الوقت الفعلي.'}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4 mt-12 w-full justify-center">
+                        <button onClick={() => setView('onboarding')} className="px-8 py-3 text-lg bg-navy-600 hover:bg-navy-700 text-beige-100 dark:bg-beige-300 dark:text-navy-900 dark:hover:bg-beige-400 font-bold rounded-xl shadow-xl transition-all transform hover:-translate-y-1">{t.startSetup}</button>
+                        <button onClick={startDemo} className="px-8 py-3 text-lg bg-beige-300 hover:bg-beige-400 dark:bg-navy-800 dark:hover:bg-navy-700 font-bold rounded-xl shadow-lg transition-all transform hover:-translate-y-1 border border-navy-500/20 dark:border-beige-200/20">{t.demoMode}</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function OnboardingWizard({
+            t,
+            lang,
+            wizardStep,
+            setWizardStep,
+            profileState,
+            setProfileState,
+            businessState,
+            setBusinessState,
+            bankState,
+            setBankState,
+            openBankModal,
+            launchDashboard,
+            startDemo
+        }) {
+            const steps = [t.profileStep, t.businessStep, t.bankStep, t.demoStep];
+            const progress = ((wizardStep + 1) / steps.length) * 100;
+
+            return (
+                <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pt-10">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setWizardStep(Math.max(0, wizardStep - 1))} className="p-2 bg-navy-600/10 dark:bg-beige-300/10 hover:bg-navy-600/20 dark:hover:bg-beige-300/20 rounded-full transition transform hover:scale-105" title="Go back">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={lang === 'ar' ? 'rotate-180' : ''}>
+                                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                                    <polyline points="12 19 5 12 12 5"></polyline>
+                                </svg>
+                            </button>
+                            <div>
+                                <h2 className="text-3xl font-bold m-0">{t.onboardingTitle}</h2>
+                                <div className="text-sm opacity-70">{steps[wizardStep]}</div>
+                            </div>
+                        </div>
+                        <div className="w-40 bg-beige-300/60 dark:bg-navy-700/50 rounded-full h-2 overflow-hidden">
+                            <div className="bg-navy-600 dark:bg-beige-300 h-2" style={{ width: `${progress}%` }}></div>
+                        </div>
+                    </div>
+
+                    {wizardStep === 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-4">
+                                <label className="block text-sm font-bold mb-1 opacity-70">{lang === 'ar' ? 'الاسم الكامل' : 'Full Name'}</label>
+                                <input
+                                    type="text"
+                                    value={profileState.name}
+                                    onChange={e => setProfileState({ ...profileState, name: e.target.value })}
+                                    className="w-full p-3 rounded-lg bg-beige-100 dark:bg-navy-800 border border-navy-500/20 dark:border-beige-200/20 focus:outline-none"
+                                    placeholder={lang === 'ar' ? 'اسمك' : 'Your name'}
+                                />
+                                <label className="block text-sm font-bold mb-1 opacity-70">{lang === 'ar' ? 'البريد الإلكتروني' : 'Email'}</label>
+                                <input
+                                    type="email"
+                                    value={profileState.email}
+                                    onChange={e => setProfileState({ ...profileState, email: e.target.value })}
+                                    className="w-full p-3 rounded-lg bg-beige-100 dark:bg-navy-800 border border-navy-500/20 dark:border-beige-200/20 focus:outline-none"
+                                    placeholder="name@company.com"
+                                />
+                                <label className="block text-sm font-bold mb-1 opacity-70">{lang === 'ar' ? 'رقم الهاتف' : 'Phone'}</label>
+                                <input
+                                    type="tel"
+                                    value={profileState.phone}
+                                    onChange={e => setProfileState({ ...profileState, phone: e.target.value })}
+                                    className="w-full p-3 rounded-lg bg-beige-100 dark:bg-navy-800 border border-navy-500/20 dark:border-beige-200/20 focus:outline-none"
+                                    placeholder={lang === 'ar' ? 'رقم الهاتف' : '+1 555 0100'}
+                                />
+                            </div>
+                            <div className="bg-beige-300/30 dark:bg-navy-800/30 p-6 rounded-xl border border-navy-500/10 dark:border-beige-200/10">
+                                <h3 className="font-bold mb-2">{lang === 'ar' ? 'ماذا يحدث لاحقاً؟' : 'What happens next?'}</h3>
+                                <p className="text-sm opacity-70 mb-4">{lang === 'ar' ? 'سنجهز تجربتك بالكامل بدون خادم. كل شيء سيبقى داخل المتصفح.' : 'We will set up your experience without a backend. Everything stays in your browser.'}</p>
+                                <div className="text-xs opacity-60">{t.bankDisclaimer}</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {wizardStep === 1 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-4">
+                                <label className="block text-sm font-bold mb-1 opacity-70">{t.businessName}</label>
+                                <input
+                                    type="text"
+                                    value={businessState.name}
+                                    onChange={e => setBusinessState({ ...businessState, name: e.target.value })}
+                                    className="w-full p-3 rounded-lg bg-beige-100 dark:bg-navy-800 border border-navy-500/20 dark:border-beige-200/20 focus:outline-none"
+                                    placeholder={t.businessNamePH}
+                                />
+                                <label className="block text-sm font-bold mb-1 opacity-70">{t.selectTemplate}</label>
+                                <select
+                                    value={businessState.type}
+                                    onChange={e => setBusinessState({ ...businessState, type: e.target.value })}
+                                    className="w-full p-3 rounded-lg bg-beige-100 dark:bg-navy-800 border border-navy-500/20 dark:border-beige-200/20"
+                                >
+                                    <option value="">{lang === 'ar' ? 'اختر قالباً' : 'Choose a template'}</option>
+                                    {t.templates.map((temp, i) => <option key={i} value={temp}>{temp}</option>)}
+                                </select>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <select
+                                        value={businessState.country}
+                                        onChange={e => setBusinessState({ ...businessState, country: e.target.value })}
+                                        className="p-3 rounded-lg bg-beige-100 dark:bg-navy-800 border border-navy-500/20 dark:border-beige-200/20"
+                                    >
+                                        <option value="">{lang === 'ar' ? 'الدولة' : 'Country'}</option>
+                                        {COUNTRIES.map((country) => (
+                                            <option key={country} value={country}>{country}</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={businessState.currency}
+                                        onChange={e => setBusinessState({ ...businessState, currency: e.target.value })}
+                                        className="p-3 rounded-lg bg-beige-100 dark:bg-navy-800 border border-navy-500/20 dark:border-beige-200/20"
+                                    >
+                                        <option value="">{lang === 'ar' ? 'العملة' : 'Currency'}</option>
+                                        {CURRENCIES.map((currency) => (
+                                            <option key={currency.code} value={currency.code}>{currency.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="bg-beige-300/30 dark:bg-navy-800/30 p-6 rounded-xl border border-dashed border-navy-500/30 dark:border-beige-200/30">
+                                <h3 className="font-bold mb-2">{lang === 'ar' ? 'جاهز للانطلاق' : 'Ready to launch'}</h3>
+                                <p className="text-sm opacity-70 mb-4">{lang === 'ar' ? 'يمكنك تحديث التفاصيل لاحقاً من لوحة التحكم.' : 'You can update business details later from the dashboard.'}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {wizardStep === 2 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-4">
+                                <div className="p-4 bg-beige-100 dark:bg-navy-800 rounded-xl border border-navy-500/10 dark:border-beige-200/10">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="font-bold">{t.connectBank}</div>
+                                            <div className="text-xs opacity-60">{t.bankDisclaimer}</div>
+                                        </div>
+                                        <button onClick={openBankModal} className="px-4 py-2 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 font-bold rounded-lg">
+                                            {bankState.connected ? t.bankConnected : t.connectBank}
+                                        </button>
+                                    </div>
+                                    {bankState.connected && (
+                                        <div className="mt-3 text-sm opacity-80">
+                                            {lang === 'ar' ? 'تم الربط:' : 'Connected:'} {bankState.bankName} ({bankState.accountMask})
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="bg-navy-600/10 dark:bg-beige-300/10 p-6 rounded-xl border border-navy-500/10 dark:border-beige-200/10">
+                                <h3 className="font-bold mb-2">{lang === 'ar' ? 'كيف يعمل الربط؟' : 'How the connection works'}</h3>
+                                <p className="text-sm opacity-70">{lang === 'ar' ? 'نحاكي خطوة OAuth مع حقول مطلوبة لتجربة كاملة.' : 'We simulate an OAuth step with required fields to show the full experience.'}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {wizardStep === 3 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-3">
+                                <h3 className="text-2xl font-bold">{t.demoModeTitle}</h3>
+                                <p className="text-sm opacity-70">{t.demoModeDesc}</p>
+                                <button onClick={startDemo} className="px-6 py-3 bg-beige-300 hover:bg-beige-400 dark:bg-navy-800 dark:hover:bg-navy-700 font-bold rounded-xl shadow-lg border border-navy-500/20 dark:border-beige-200/20">
+                                    {t.startDemo}
+                                </button>
+                            </div>
+                            <div className="bg-beige-100 dark:bg-navy-800 p-6 rounded-xl border border-navy-500/10 dark:border-beige-200/10">
+                                <h4 className="font-bold mb-2">{lang === 'ar' ? 'بدون بيانات؟' : 'No data yet?'}</h4>
+                                <p className="text-sm opacity-70">{lang === 'ar' ? 'ابدأ بلوحة فارغة وأضف ملفاتك لاحقاً.' : 'Start with a clean dashboard and upload your files later.'}</p>
+                                <button onClick={launchDashboard} className="mt-4 px-4 py-2 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 font-bold rounded-lg">
+                                    {t.launchDashboard}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-center">
+                        <button
+                            onClick={() => setWizardStep(Math.max(0, wizardStep - 1))}
+                            className="px-4 py-2 rounded-lg border border-navy-500/20 dark:border-beige-200/20"
+                            disabled={wizardStep === 0}
+                        >
+                            {t.back}
+                        </button>
+                        <button
+                            onClick={() => wizardStep === steps.length - 1 ? launchDashboard() : setWizardStep(wizardStep + 1)}
+                            className="px-5 py-2 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 font-bold rounded-lg"
+                        >
+                            {wizardStep === steps.length - 1 ? t.launchDashboard : t.continue}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function DashboardView({ t, d, lang, kpis, monthlyPerformance, demoMode, onResetDemo, aiInsights, aiWarnings }) {
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+
+            useEffect(() => {
+                if (chartRef.current) {
+                    if (chartInstance.current) {
+                        chartInstance.current.data.labels = monthlyPerformance.labels;
+                        chartInstance.current.data.datasets[0].data = monthlyPerformance.revenue;
+                        chartInstance.current.data.datasets[1].data = monthlyPerformance.expenses;
+                        chartInstance.current.options.plugins.legend.rtl = lang === 'ar';
+                        chartInstance.current.update();
+                    } else {
+                        const ctx = chartRef.current.getContext('2d');
+                        Chart.defaults.font.family = "system-ui, -apple-system, sans-serif";
+                        chartInstance.current = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: monthlyPerformance.labels,
+                                datasets: [
+                                    { label: t.totalRev, data: monthlyPerformance.revenue, borderColor: '#10b981', tension: 0.4 },
+                                    { label: t.totalExp, data: monthlyPerformance.expenses, borderColor: '#ef4444', tension: 0.4 }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        labels: { color: 'gray' },
+                                        rtl: lang === 'ar'
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            }, [lang, t, JSON.stringify(monthlyPerformance)]);
+
+            useEffect(() => {
+                return () => {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                        chartInstance.current = null;
+                    }
+                };
+            }, []);
+
+            return (
+                <div className="space-y-6 animate-fade-in relative pb-10">
+                    <div className="sticky top-0 z-20 bg-beige-200/90 dark:bg-navy-900/90 backdrop-blur-md pb-4 pt-2 -mx-4 px-4 sm:-mx-8 sm:px-8 border-b border-navy-500/10 dark:border-beige-200/10 shadow-sm">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-2xl font-bold">{t.financialOverview}</h2>
+                            {demoMode && (
+                                <button onClick={onResetDemo} className="text-xs font-bold bg-navy-600/10 dark:bg-beige-300/10 px-3 py-1.5 rounded-full hover:bg-navy-600/20 dark:hover:bg-beige-300/20 transition">
+                                    {t.resetDemo}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b pb-6 border-navy-500/10 dark:border-beige-200/10">
+                        <div className="p-5 rounded-xl bg-beige-100 dark:bg-navy-800 shadow-sm border border-navy-500/5 dark:border-beige-200/5">
+                            <div className="text-sm opacity-70 font-bold">{t.totalRev}</div>
+                            <div className="text-3xl font-bold text-success mt-1">${kpis.totalRev.toLocaleString()}</div>
+                            {demoMode && <div className="text-xs mt-2 opacity-70">+12% {t.vsLastMonth}</div>}
+                        </div>
+                        <div className="p-5 rounded-xl bg-beige-100 dark:bg-navy-800 shadow-sm border border-navy-500/5 dark:border-beige-200/5">
+                            <div className="text-sm opacity-70 font-bold">{t.totalExp}</div>
+                            <div className="text-3xl font-bold text-danger mt-1">${kpis.totalExp.toLocaleString()}</div>
+                            {demoMode && <div className="text-xs mt-2 opacity-70">+3% {t.vsLastMonth}</div>}
+                        </div>
+                        <div className="p-5 rounded-xl bg-beige-100 dark:bg-navy-800 shadow-sm border border-navy-500/5 dark:border-beige-200/5 relative overflow-hidden">
+                            <div className="text-sm opacity-70 font-bold">{t.netProfit}</div>
+                            <div className="text-3xl font-bold mt-1">${kpis.netProfit.toLocaleString()}</div>
+                            <div className={"absolute -bottom-4 opacity-10 " + (lang === 'en' ? '-right-4' : '-left-4')}><Icons.TrendingUp /></div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Chart */}
+                        <div className="lg:col-span-2 bg-beige-100 dark:bg-navy-800 rounded-xl p-4 shadow-sm h-80">
+                            <h3 className="font-bold mb-4">{t.cashflowTrends}</h3>
+                            <div className="h-64 relative" dir="ltr"><canvas ref={chartRef}></canvas></div>
+                        </div>
+
+                        {/* AI Advice Panel */}
+                        <div className="space-y-4">
+                            <div className="bg-danger/10 border border-danger/20 rounded-xl p-4">
+                                <h3 className="font-bold text-danger flex items-center gap-2 mb-2"><Icons.AlertTriangle className="w-4 h-4" /> {t.aiWarnings}</h3>
+                                <ul className="space-y-2 text-sm">
+                                    {aiWarnings.map((w, i) => <li key={i} className="leading-tight">• {w}</li>)}
+                                </ul>
+                            </div>
+
+                            <div className="bg-beige-100 dark:bg-navy-800 rounded-xl p-4 shadow-sm border border-navy-500/10 dark:border-beige-200/10">
+                                <h3 className="font-bold flex items-center gap-2 mb-2"><Icons.Check className="w-4 h-4 text-success" /> {t.keyInsights}</h3>
+                                <ul className="space-y-2 text-sm opacity-80">
+                                    {aiInsights.map((ins, i) => <li key={i} className="leading-tight border-b border-navy-500/5 dark:border-beige-200/5 pb-2 last:border-0">• {ins}</li>)}
+                                </ul>
+                            </div>
+
+                            {demoMode && (
+                                <div className="bg-gradient-to-br from-navy-500 to-teal-500 dark:from-beige-300 dark:to-teal-300 text-beige-100 dark:text-navy-900 rounded-xl p-4 shadow-md">
+                                    <h3 className="font-bold flex items-center gap-2 mb-1"><Icons.Lightbulb className="w-4 h-4" /> {t.aiRec}</h3>
+                                    <p className="text-sm leading-tight">{d.recommendation}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function UploadView({ t, lang, onAddTransactions, parseStatus, setParseStatus, onAnalyzeCsv, onAnalyzeMedia, demoMode }) {
+            const fileInputRef = useRef(null);
+            const [manualDate, setManualDate] = useState('');
+            const [manualDesc, setManualDesc] = useState('');
+            const [manualAmount, setManualAmount] = useState('');
+            const [manualType, setManualType] = useState('out');
+            const [nlText, setNlText] = useState('');
+            const [isNlLoading, setIsNlLoading] = useState(false);
+            const [isUploadLoading, setIsUploadLoading] = useState(false);
+
+            const ensurePdfWorker = () => {
+                if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                }
+            };
+
+            const parseCsvText = async (csvText) => {
+                return new Promise((resolve, reject) => {
+                    window.Papa.parse(csvText, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: results => resolve(results.data || []),
+                        error: err => reject(err)
+                    });
+                });
+            };
+
+            const parseExcelFile = async (file) => {
+                const buffer = await file.arrayBuffer();
+                const wb = window.XLSX.read(buffer, { type: 'array' });
+                const sheetName = wb.SheetNames[0];
+                const sheet = wb.Sheets[sheetName];
+                const csvText = window.XLSX.utils.sheet_to_csv(sheet);
+                return { csvText };
+            };
+
+            const parsePdfText = async (file) => {
+                ensurePdfWorker();
+                const buffer = await file.arrayBuffer();
+                const doc = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+                let fullText = '';
+                for (let i = 1; i <= doc.numPages; i += 1) {
+                    const page = await doc.getPage(i);
+                    const text = await page.getTextContent();
+                    fullText += text.items.map(item => item.str).join(' ') + '\n';
+                }
+                return fullText.trim();
+            };
+
+            const readAsDataUrl = async (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            const handleFiles = async (files) => {
+                setIsUploadLoading(true);
+                setParseStatus('');
+                setParseStatus(lang === 'ar' ? 'جارٍ المعالجة بواسطة الذكاء الاصطناعي...' : 'Processing with AI...');
+
+                for (const file of files) {
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    try {
+                        if (ext === 'csv') {
+                            const csvText = await file.text();
+                            const results = await parseCsvText(csvText);
+                            if (results && results.length > 0) onAddTransactions(results);
+                            if (onAnalyzeCsv) {
+                                await onAnalyzeCsv(csvText, true);
+                            }
+                            setParseStatus(lang === 'ar'
+                                ? 'تم تحليل ملف CSV بنجاح.'
+                                : 'CSV analyzed successfully.');
+                        } else if (ext === 'xlsx' || ext === 'xls') {
+                            const { csvText } = await parseExcelFile(file);
+                            const results = await parseCsvText(csvText);
+                            if (results && results.length > 0) onAddTransactions(results);
+                            if (onAnalyzeCsv) {
+                                await onAnalyzeCsv(csvText, true);
+                            }
+                            setParseStatus(lang === 'ar'
+                                ? 'تم تحويل ملف Excel وتحليله.'
+                                : 'Excel converted and analyzed successfully.');
+                        } else if (ext === 'pdf' && onAnalyzeMedia) {
+                            const textContent = await parsePdfText(file);
+                            await onAnalyzeMedia({ fileName: file.name, fileType: 'pdf', textContent });
+                            setParseStatus(lang === 'ar'
+                                ? 'تم تحليل ملف PDF بواسطة الذكاء الاصطناعي.'
+                                : 'PDF analyzed by AI.');
+                        } else if ((ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'webp') && onAnalyzeMedia) {
+                            const dataUrl = await readAsDataUrl(file);
+                            await onAnalyzeMedia({ fileName: file.name, fileType: 'image', dataUrl });
+                            setParseStatus(lang === 'ar'
+                                ? 'تم تحليل الصورة بواسطة الذكاء الاصطناعي.'
+                                : 'Image analyzed by AI.');
+                        }
+                    } catch (err) {
+                        setParseStatus(lang === 'ar'
+                            ? 'فشل تحليل الملف.'
+                            : 'Failed to analyze file.');
+                    }
+                }
+                setIsUploadLoading(false);
+            };
+
+            const handleManualAdd = () => {
+                if (!manualAmount.trim()) return;
+                const amt = coerceNumber(manualAmount);
+                if (amt === null) return;
+
+                const signed = manualType === 'out' ? -Math.abs(amt) : Math.abs(amt);
+                const row = {
+                    date: manualDate || new Date().toISOString().slice(0, 10),
+                    desc: manualDesc || 'Manual entry',
+                    amount: signed
+                };
+                onAddTransactions([row]);
+                if (onAnalyzeCsv) {
+                    onAnalyzeCsv(rowsToCsv([row]), true);
+                }
+
+                setManualDate('');
+                setManualDesc('');
+                setManualAmount('');
+            };
+
+            const handleNlToTable = async () => {
+                const text = nlText.trim();
+                if (!text) return;
+                setIsNlLoading(true);
+
+                try {
+                    const response = await fetch(`${API_BASE}/api/nl`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text, lang })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (Array.isArray(data.transactions) && data.transactions.length) {
+                            onAddTransactions(data.transactions);
+                            if (onAnalyzeCsv) {
+                                onAnalyzeCsv(rowsToCsv(data.transactions), true);
+                            }
+                            setNlText('');
+                            setIsNlLoading(false);
+                            return;
+                        }
+                    }
+                } catch (err) {
+                    // Fall back to heuristic parsing.
+                }
+
+                let amount = null;
+                const currencyMatch = text.match(/[$£€]\s*(\d+(?:,\d{3})*(?:\.\d{2})?)|(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(?:[$£€]|dollars?|bucks?)/i);
+                if (currencyMatch) {
+                    amount = coerceNumber(currencyMatch[1] || currencyMatch[2]);
+                } else {
+                    const basicMatch = text.match(/\d+(?:,\d{3})*(?:\.\d{2})?/);
+                    if (basicMatch) amount = coerceNumber(basicMatch[0]);
+                }
+
+                if (amount !== null && text.toLowerCase().includes('each')) {
+                    const qtyMatch = text.match(/.*?(\d+).*?each/i);
+                    if (qtyMatch) {
+                        const qty = coerceNumber(qtyMatch[1]);
+                        if (qty && qty !== amount) amount = amount * qty;
+                    }
+                }
+
+                if (amount === null) {
+                    setIsNlLoading(false);
+                    return;
+                }
+
+                const isIncome = /sell|sold|revenue|received|income|earned/i.test(text);
+                const signed = isIncome ? Math.abs(amount) : -Math.abs(amount);
+                const desc = text.length > 60 ? `${text.slice(0, 57)}...` : text;
+
+                onAddTransactions([
+                    {
+                        date: new Date().toISOString().slice(0, 10),
+                        desc,
+                        amount: signed
+                    }
+                ]);
+                setNlText('');
+                setIsNlLoading(false);
+            };
+
+            return (
+                <div className="space-y-6 animate-fade-in pb-10 relative">
+                    <div className="sticky top-0 z-20 bg-beige-200/90 dark:bg-navy-900/90 backdrop-blur-md pb-4 pt-2 -mx-4 px-4 sm:-mx-8 sm:px-8 border-b border-navy-500/10 dark:border-beige-200/10 shadow-sm">
+                        <h2 className="text-2xl font-bold">{t.dataIngestion}</h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div
+                            className="bg-beige-300/30 dark:bg-navy-800 border-2 border-dashed border-navy-500/30 dark:border-beige-200/30 rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-navy-500/5 dark:hover:bg-beige-200/5 transition"
+                            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                        >
+                            <Icons.Upload className="w-12 h-12 mb-4 opacity-50" />
+                            <h3 className="font-bold text-lg mb-1">{t.uploadFile}</h3>
+                            <p className="text-sm opacity-70 mb-4">{t.dragFiles}</p>
+                            <button className="bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-50" disabled={isUploadLoading}>
+                                {isUploadLoading ? (lang === 'ar' ? 'جارٍ المعالجة...' : 'Processing...') : t.browseFiles}
+                            </button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".xlsx,.xls,.pdf,.png,.jpg,.jpeg,.webp"
+                                multiple
+                                className="hidden"
+                                onChange={e => handleFiles(Array.from(e.target.files || []))}
+                            />
+                        </div>
+
+                        <div className="bg-beige-100 dark:bg-navy-800 rounded-xl p-6 shadow-sm border border-navy-500/10 dark:border-beige-200/10">
+                            <h3 className="font-bold flex items-center gap-2 mb-3"><Icons.Message className="w-4 h-4" /> {t.nlToTable}</h3>
+                            <p className="text-sm opacity-70 mb-4">{t.nlDesc}</p>
+                            <textarea
+                                className="w-full h-24 p-3 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20 focus:outline-none text-sm resize-none mb-3"
+                                placeholder={t.nlPH}
+                                value={nlText}
+                                onChange={e => setNlText(e.target.value)}
+                            ></textarea>
+                            <button onClick={handleNlToTable} disabled={isNlLoading} className="w-full py-2 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 font-bold rounded-lg shadow-sm disabled:opacity-50">{isNlLoading ? (lang === 'ar' ? 'جارٍ التحليل...' : 'Analyzing...') : t.extractOrg}</button>
+                        </div>
+                    </div>
+
+                    <div className="bg-beige-100 dark:bg-navy-800 rounded-xl p-6 shadow-sm border border-navy-500/10 dark:border-beige-200/10">
+                        <h3 className="font-bold mb-4">{lang === 'ar' ? 'إدخال يدوي' : 'Manual Entry'}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <input
+                                type="date"
+                                value={manualDate}
+                                onChange={e => setManualDate(e.target.value)}
+                                className="p-2 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20"
+                            />
+                            <input
+                                type="text"
+                                value={manualDesc}
+                                onChange={e => setManualDesc(e.target.value)}
+                                placeholder={lang === 'ar' ? 'الوصف' : 'Description'}
+                                className="p-2 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20"
+                            />
+                            <input
+                                type="text"
+                                value={manualAmount}
+                                onChange={e => setManualAmount(e.target.value)}
+                                placeholder={lang === 'ar' ? 'المبلغ' : 'Amount'}
+                                className="p-2 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20"
+                            />
+                            <select
+                                value={manualType}
+                                onChange={e => setManualType(e.target.value)}
+                                className="p-2 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20"
+                            >
+                                <option value="out">{lang === 'ar' ? 'مصروف' : 'Expense'}</option>
+                                <option value="in">{lang === 'ar' ? 'إيراد' : 'Revenue'}</option>
+                            </select>
+                        </div>
+                        <button
+                            onClick={handleManualAdd}
+                            className="mt-3 px-4 py-2 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 font-bold rounded-lg"
+                        >
+                            {lang === 'ar' ? 'إضافة' : 'Add'}
+                        </button>
+                    </div>
+
+                    {parseStatus && (
+                        <div className="text-sm bg-beige-300/40 dark:bg-navy-700/40 border border-navy-500/10 dark:border-beige-200/10 rounded-lg p-3">
+                            {parseStatus}
+                        </div>
+                    )}
+
+                    {demoMode && (
+                        <div className="bg-success/10 border border-success/20 rounded-xl p-4 text-sm mt-4">
+                            <strong className="mx-1">AI Output Simulation:</strong> {t.simOutput}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function BankingView({ t, d, lang, bankState, openBankModal, openPayModal }) {
+            const alignRight = lang === 'ar' ? 'text-left' : 'text-right';
+            const alignLeft = lang === 'ar' ? 'text-right' : 'text-left';
+
+            return (
+                <div className="space-y-6 animate-fade-in max-w-4xl relative pb-10">
+                    <div className="sticky top-0 z-20 bg-beige-200/90 dark:bg-navy-900/90 backdrop-blur-md pb-4 pt-2 -mx-4 px-4 sm:-mx-8 sm:px-8 border-b border-navy-500/10 dark:border-beige-200/10 shadow-sm">
+                        <div className="flex justify-between items-end">
+                            <div>
+                                <h2 className="text-2xl font-bold">{t.openBanking}</h2>
+                                <p className="text-sm opacity-70 mt-1">{t.openBankingDesc}</p>
+                            </div>
+                            <div className="flex gap-3 items-center">
+                                <button onClick={openBankModal} className="bg-beige-300 dark:bg-navy-700 text-navy-900 dark:text-beige-100 px-4 py-2 rounded-lg font-bold text-sm shadow-md">
+                                    {bankState.connected ? t.bankConnected : t.connectBank}
+                                </button>
+                                <button onClick={openPayModal} className="bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 px-4 py-2 rounded-lg font-bold text-sm shadow-md flex gap-2 items-center"><Icons.CreditCard /> {t.payBill}</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-beige-100 dark:bg-navy-800 rounded-xl shadow-sm border border-navy-500/10 dark:border-beige-200/10 overflow-hidden">
+                        <table className="w-full border-collapse">
+                            <thead className="sticky top-0 z-10">
+                                <tr className={"bg-beige-200 dark:bg-navy-700 text-sm font-bold shadow-sm " + alignLeft}>
+                                    <th className="p-4 border-b border-navy-500/10 dark:border-beige-200/10 backdrop-blur-md bg-beige-200/90 dark:bg-navy-700/90">{t.date}</th>
+                                    <th className="p-4 border-b border-navy-500/10 dark:border-beige-200/10 backdrop-blur-md bg-beige-200/90 dark:bg-navy-700/90">{t.desc}</th>
+                                    <th className={"p-4 border-b border-navy-500/10 dark:border-beige-200/10 backdrop-blur-md bg-beige-200/90 dark:bg-navy-700/90 " + alignRight}>{t.amount}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {d.transactions.map(tx => (
+                                    <tr key={tx.id} className={"text-sm border-b border-navy-500/5 dark:border-beige-200/5 hover:bg-navy-500/5 dark:hover:bg-beige-200/5 " + alignLeft}>
+                                        <td className="p-4 opacity-70" dir="ltr">{tx.date}</td>
+                                        <td className="p-4 font-medium">{tx.desc}</td>
+                                        <td className={`p-4 font-bold ${tx.type === 'in' ? 'text-success' : ''} ${alignRight}`} dir="ltr">
+                                            {tx.type === 'in' ? '+' : '-'}${Math.abs(tx.amount)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        // ================= AI BACKEND =================
+
+        const API_BASE = (() => {
+            const { protocol, hostname } = window.location;
+            if (protocol === 'file:' || !hostname) {
+                return 'http://localhost:3001';
+            }
+
+            // Reuse the current host so LAN/device testing does not break on hardcoded localhost.
+            const apiProtocol = protocol === 'https:' ? 'https:' : 'http:';
+            return `${apiProtocol}//${hostname}:3001`;
+        })();
+
+        const buildOfflineReply = ({ message, lang, appState }) => {
+            const txCount = Array.isArray(appState?.transactions) ? appState.transactions.length : 0;
+            const kpis = appState?.kpis || { totalRev: 0, totalExp: 0, netProfit: 0 };
+            const lowerMsg = message.toLowerCase();
+
+            let contextReplyEn = `You have ${txCount} transactions. Revenue is $${kpis.totalRev.toLocaleString()}, expenses are $${kpis.totalExp.toLocaleString()}, and net profit is $${kpis.netProfit.toLocaleString()}.`;
+            let contextReplyAr = `لديك ${txCount} معاملات. الإيرادات ${kpis.totalRev.toLocaleString()}$، النفقات ${kpis.totalExp.toLocaleString()}$، وصافي الربح ${kpis.netProfit.toLocaleString()}$.`;
+
+            if (lowerMsg.includes('expense') || lowerMsg.includes('spending')) {
+                contextReplyEn = `Your total expenses are $${kpis.totalExp.toLocaleString()}. Look for ways to reduce recurring costs.`;
+                contextReplyAr = `إجمالي نفقاتك ${kpis.totalExp.toLocaleString()}$. ابحث عن طرق لتقليل التكاليف المتكررة.`;
+            } else if (lowerMsg.includes('revenue') || lowerMsg.includes('income')) {
+                contextReplyEn = `Your total revenue is $${kpis.totalRev.toLocaleString()}. Keep up the good work!`;
+                contextReplyAr = `إجمالي إيراداتك ${kpis.totalRev.toLocaleString()}$. عمل ممتاز!`;
+            } else if (lowerMsg.includes('hi') || lowerMsg.includes('hello') || lowerMsg.includes('مرحبا') || lowerMsg.includes('مرحباً')) {
+                contextReplyEn = `Hello! How can I help you with your finances today?`;
+                contextReplyAr = `مرحباً! كيف يمكنني مساعدتك في شؤونك المالية اليوم؟`;
+            }
+
+            if (lang === 'ar') {
+                return [
+                    'أنا أعمل في وضع التصفح الداخلي حالياً (الخادم غير متاح)، لكن إليك التحديث:',
+                    contextReplyAr
+                ].join('\n\n');
+            }
+
+            return [
+                "I'm operating in local mode right now (no backend), but here is what I see:",
+                contextReplyEn
+            ].join('\n\n');
+        };
+
+        function ChatWidget({ lang, t, appState }) {
+            const [chatOpen, setChatOpen] = useState(false);
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const messagesEndRef = useRef(null);
+
+            useEffect(() => {
+                if (messagesEndRef.current) {
+                    messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, [messages, isLoading]);
+
+            // Reset chat when language changes
+            useEffect(() => {
+                setMessages([]);
+            }, [lang]);
+
+            const buildAppContext = () => {
+                const ctx = {
+                    view: appState?.view || null,
+                    business: appState?.businessState || null,
+                    demo: appState?.demoData || null,
+                    transactions: appState?.transactions || null,
+                    kpis: appState?.kpis || null,
+                    monthlyPerformance: appState?.monthlyPerformance || null,
+                    demoMode: appState?.demoMode || false
+                };
+
+                return ctx;
+            };
+
+            const sendMessage = async () => {
+                const trimmed = input.trim();
+                if (!trimmed || isLoading) return;
+
+                const userMsg = { role: 'user', content: trimmed };
+                const newMessages = [...messages, userMsg];
+                setMessages(newMessages);
+                setInput('');
+                setIsLoading(true);
+
+                try {
+                    const response = await fetch(`${API_BASE}/api/chat`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            messages: newMessages,
+                            context: buildAppContext(),
+                            lang
+                        })
+                    });
+
+                    if (!response.ok) {
+                        let errMsg = "API error";
+                        try {
+                            const err = await response.json();
+                            errMsg = err?.error?.message || err?.message || err?.detail || errMsg;
+                        } catch (parseErr) {
+                            // Keep default errMsg when response is not JSON.
+                        }
+                        throw new Error(errMsg);
+                    }
+
+                    const data = await response.json();
+                    const reply = data.reply || "Sorry, I couldn't get a response.";
+                    setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+                } catch (err) {
+                    const errText = String(err?.message || '');
+                    const isNetworkError = /failed to fetch|networkerror|load failed/i.test(errText);
+
+                    if (isNetworkError) {
+                        const offlineReply = buildOfflineReply({ message: trimmed, lang, appState });
+                        setMessages(prev => [...prev, { role: 'assistant', content: offlineReply }]);
+                    } else {
+                        const errorMsg = lang === 'ar'
+                            ? "⚠️ تعذر الحصول على رد من خدمة الذكاء الاصطناعي. تأكد من إعدادات الخادم ومفتاح API."
+                            : "⚠️ Could not get a response from the AI service. Check backend setup and API key.";
+                        setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
+                    }
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            };
+
+            return (
+                <div className={"fixed bottom-6 z-50 " + (lang === 'en' ? "right-6" : "left-6")}>
+                    {chatOpen ? (
+                        <div className="w-80 h-[28rem] bg-beige-100 dark:bg-navy-800 rounded-2xl shadow-2xl border border-navy-500/20 dark:border-beige-200/20 flex flex-col overflow-hidden animate-fade-in">
+                            {/* Header */}
+                            <div className="p-3 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 font-bold flex justify-between items-center flex-shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <Icons.Deer className="w-5 h-5" />
+                                    {t.chatTitle}
+                                </div>
+                                <button onClick={() => setChatOpen(false)} className="hover:opacity-70 text-xl leading-none">&times;</button>
+                            </div>
+
+                            {/* Messages */}
+                            <div className="flex-1 p-4 overflow-y-auto space-y-3 text-sm" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                                {messages.map((msg, i) => (
+                                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[85%] p-3 rounded-2xl leading-relaxed ${msg.role === 'user'
+                                            ? 'bg-navy-600 text-beige-100 dark:bg-beige-400 dark:text-navy-900 rounded-br-sm'
+                                            : 'bg-navy-500/10 dark:bg-beige-200/10 rounded-bl-sm'
+                                            }`}>
+                                            {msg.content}
+                                        </div>
+                                    </div>
+                                ))}
+                                {isLoading && (
+                                    <div className="flex justify-start">
+                                        <div className="bg-navy-500/10 dark:bg-beige-200/10 p-3 rounded-2xl rounded-bl-sm">
+                                            <span className="inline-flex gap-1">
+                                                <span className="w-2 h-2 bg-navy-400 dark:bg-beige-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                                <span className="w-2 h-2 bg-navy-400 dark:bg-beige-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                                <span className="w-2 h-2 bg-navy-400 dark:bg-beige-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                                <div ref={messagesEndRef} />
+                            </div>
+
+                            {/* Input */}
+                            <div className="p-3 border-t border-navy-500/10 dark:border-beige-200/10 flex gap-2 flex-shrink-0" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                                <input
+                                    type="text"
+                                    value={input}
+                                    onChange={e => setInput(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder={t.chatAsk}
+                                    disabled={isLoading}
+                                    className="flex-1 bg-transparent border border-navy-500/30 dark:border-beige-200/30 rounded-full px-3 py-1.5 focus:outline-none focus:border-navy-500 dark:focus:border-beige-300 text-sm disabled:opacity-50"
+                                />
+                                <button
+                                    onClick={sendMessage}
+                                    disabled={isLoading || !input.trim()}
+                                    className="w-8 h-8 flex items-center justify-center bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 rounded-full hover:opacity-90 disabled:opacity-40 transition flex-shrink-0"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={lang === 'ar' ? 'rotate-180' : ''}>
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setChatOpen(true)}
+                            className="w-14 h-14 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 rounded-full shadow-xl flex items-center justify-center hover:scale-105 transition-transform"
+                        >
+                            <Icons.Message />
+                        </button>
+                    )}
+                </div>
+            );
+        }
+
+        function BankConnectModal({ t, lang, onClose, onConnect }) {
+            const [bankName, setBankName] = useState('');
+            const [accountName, setAccountName] = useState('');
+            const [accountNumber, setAccountNumber] = useState('');
+            const [routingNumber, setRoutingNumber] = useState('');
+            const [consent, setConsent] = useState(false);
+
+            const canSubmit = bankName && accountName && accountNumber && routingNumber && consent;
+            const mask = accountNumber.length >= 4
+                ? `****${accountNumber.slice(-4)}`
+                : accountNumber;
+
+            return (
+                <div className="fixed inset-0 bg-navy-900/40 backdrop-blur-sm flex items-center justify-center z-[60]">
+                    <div className="w-full max-w-lg bg-beige-100 dark:bg-navy-800 rounded-2xl shadow-2xl border border-navy-500/20 dark:border-beige-200/20 overflow-hidden">
+                        <div className="p-4 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 font-bold flex justify-between items-center">
+                            <span>{t.connectBank}</span>
+                            <button onClick={onClose} className="text-xl leading-none">&times;</button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="text-xs opacity-60">{t.bankDisclaimer}</div>
+                            <select value={bankName} onChange={e => setBankName(e.target.value)} className="w-full p-3 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20">
+                                <option value="">{lang === 'ar' ? 'اختر البنك' : 'Select Bank'}</option>
+                                <option value="Udeer National Bank">Udeer National Bank</option>
+                                <option value="Cedar Finance">Cedar Finance</option>
+                                <option value="Northbridge">Northbridge</option>
+                            </select>
+                            <input
+                                type="text"
+                                value={accountName}
+                                onChange={e => setAccountName(e.target.value)}
+                                placeholder={lang === 'ar' ? 'اسم صاحب الحساب' : 'Account holder name'}
+                                className="w-full p-3 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20"
+                            />
+                            <div className="grid grid-cols-2 gap-3">
+                                <input
+                                    type="text"
+                                    value={accountNumber}
+                                    onChange={e => setAccountNumber(e.target.value)}
+                                    placeholder={lang === 'ar' ? 'رقم الحساب' : 'Account number'}
+                                    className="p-3 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20"
+                                />
+                                <input
+                                    type="text"
+                                    value={routingNumber}
+                                    onChange={e => setRoutingNumber(e.target.value)}
+                                    placeholder={lang === 'ar' ? 'رقم التوجيه' : 'Routing number'}
+                                    className="p-3 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20"
+                                />
+                            </div>
+                            <label className="flex items-start gap-2 text-sm opacity-80">
+                                <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} />
+                                <span>{lang === 'ar' ? 'أوافق على محاكاة الربط لأغراض العرض فقط.' : 'I consent to a simulated connection for demo purposes only.'}</span>
+                            </label>
+                            <button
+                                onClick={() => onConnect({ bankName, accountMask: mask })}
+                                disabled={!canSubmit}
+                                className="w-full py-2 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 font-bold rounded-lg disabled:opacity-50"
+                            >
+                                {t.connectBank}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function PayBillModal({ t, lang, onClose, onPay }) {
+            const [vendor, setVendor] = useState('');
+            const [amount, setAmount] = useState('');
+            const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+            const canSubmit = vendor && amount;
+
+            return (
+                <div className="fixed inset-0 bg-navy-900/40 backdrop-blur-sm flex items-center justify-center z-[60]">
+                    <div className="w-full max-w-lg bg-beige-100 dark:bg-navy-800 rounded-2xl shadow-2xl border border-navy-500/20 dark:border-beige-200/20 overflow-hidden">
+                        <div className="p-4 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 font-bold flex justify-between items-center">
+                            <span>{t.payBill}</span>
+                            <button onClick={onClose} className="text-xl leading-none">&times;</button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="text-xs opacity-60">{t.bankDisclaimer}</div>
+                            <input
+                                type="text"
+                                value={vendor}
+                                onChange={e => setVendor(e.target.value)}
+                                placeholder={lang === 'ar' ? 'الجهة المستفيدة' : 'Payee / Vendor'}
+                                className="w-full p-3 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20"
+                            />
+                            <div className="grid grid-cols-2 gap-3">
+                                <input
+                                    type="text"
+                                    value={amount}
+                                    onChange={e => setAmount(e.target.value)}
+                                    placeholder={lang === 'ar' ? 'المبلغ' : 'Amount'}
+                                    className="p-3 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20"
+                                />
+                                <input
+                                    type="date"
+                                    value={date}
+                                    onChange={e => setDate(e.target.value)}
+                                    className="p-3 rounded-lg bg-beige-200 dark:bg-navy-900 border border-navy-500/20 dark:border-beige-200/20"
+                                />
+                            </div>
+                            <button
+                                onClick={() => onPay({ vendor, amount: coerceNumber(amount) || 0, date })}
+                                disabled={!canSubmit}
+                                className="w-full py-2 bg-navy-600 text-beige-100 dark:bg-beige-300 dark:text-navy-900 font-bold rounded-lg disabled:opacity-50"
+                            >
+                                {t.payBill}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render React
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+    </script>
+
+    <style>
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</body>
+
+</html>
